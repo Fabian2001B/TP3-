@@ -6,6 +6,9 @@ public class BTree {
     private BNo raiz;
 
     public BTree(int ordem) {
+        if (ordem < 2) {
+            throw new IllegalArgumentException("A ordem da árvore B deve ser maior ou igual a 2.");
+        }
         this.ordem = ordem;
         this.raiz = new BNo(true);
     }
@@ -22,50 +25,65 @@ public class BTree {
         }
     }
 
+    /**
+     * Carrega uma lista de chaves ordenadas na árvore B de forma eficiente.
+     *
+     * @param listaOrdenada Lista de chaves já ordenadas.
+     */
     public void carregamentoEmMassa(List<Double> listaOrdenada) {
-        List<BNo> folhas = criarFolhas(listaOrdenada);
-        raiz = construirArvore(folhas);
+        System.out.println("Total de chaves a serem inseridas: " + listaOrdenada.size());
+
+        // Constrói a árvore B diretamente a partir da lista ordenada
+        raiz = construirArvore(listaOrdenada, 0, listaOrdenada.size() - 1, true);
+        System.out.println("Carregamento em massa concluído.");
     }
 
-    private List<BNo> criarFolhas(List<Double> listaOrdenada) {
-        List<BNo> folhas = new ArrayList<>();
-        int maximo = 2 * ordem - 1;
-        int i = 0;
-        while (i < listaOrdenada.size()) {
-            BNo folha = new BNo(true);
-            int fim = Math.min(i + maximo, listaOrdenada.size());
-            folha.chaves.addAll(listaOrdenada.subList(i, fim));
-            folhas.add(folha);
-            i = fim;
+    /**
+     * Constrói a árvore B recursivamente a partir de uma lista ordenada.
+     *
+     * @param listaOrdenada Lista de chaves já ordenadas.
+     * @param inicio        Índice inicial da sublista.
+     * @param fim           Índice final da sublista.
+     * @param folha         Indica se o nó atual é uma folha.
+     * @return Nó raiz da subárvore construída.
+     */
+    private BNo construirArvore(List<Double> listaOrdenada, int inicio, int fim, boolean folha) {
+        if (inicio > fim) {
+            return null;
         }
-        return folhas;
-    }
 
-    private BNo construirArvore(List<BNo> nos) {
-        if (nos.size() == 1) return nos.get(0);
+        // Criar um novo nó
+        BNo no = new BNo(folha);
 
-        List<BNo> pais = new ArrayList<>();
-        int maximoFilhos = 2 * ordem;
-        int i = 0;
+        // Se for um nó folha, preencher com as chaves diretamente
+        if (folha) {
+            no.chaves.addAll(listaOrdenada.subList(inicio, fim + 1));
+        } else {
+            // Se for um nó interno, dividir a lista em partes iguais e criar filhos recursivamente
+            int tamanho = fim - inicio + 1;
+            int chavesPorNo = 2 * ordem - 1; // Capacidade máxima de chaves por nó
+            int numFilhos = (tamanho + chavesPorNo - 1) / chavesPorNo; // Número de filhos necessários
 
-        while (i < nos.size()) {
-            BNo pai = new BNo(false);
-            int fim = Math.min(i + maximoFilhos, nos.size());
-            List<BNo> filhos = nos.subList(i, fim);
+            // Dividir a lista em partes iguais para cada filho
+            for (int i = 0; i < numFilhos; i++) {
+                int inicioFilho = inicio + i * chavesPorNo;
+                int fimFilho = Math.min(inicioFilho + chavesPorNo - 1, fim);
 
-            pai.filhos.add(filhos.get(0));
-            for (int j = 1; j < filhos.size(); j++) {
-                pai.chaves.add(filhos.get(j).chaves.get(0));
-                pai.filhos.add(filhos.get(j));
+                // Adicionar a chave mediana ao nó atual
+                if (i > 0) {
+                    no.chaves.add(listaOrdenada.get(inicioFilho - 1));
+                }
+
+                // Criar o filho recursivamente
+                BNo filho = construirArvore(listaOrdenada, inicioFilho, fimFilho, i == numFilhos - 1);
+                no.filhos.add(filho);
             }
-
-            pais.add(pai);
-            i = fim;
         }
 
-        return construirArvore(pais);
+        return no;
     }
 
+    // Métodos de busca, inserção, remoção e impressão (mantidos da versão anterior)
     public boolean buscar(double chave) {
         return buscar(raiz, chave);
     }
@@ -132,14 +150,14 @@ public class BTree {
 
     private void remover(BNo no, double chave) {
         int indice = encontrarIndice(no, chave);
-        
+
         if (indice < no.chaves.size() && no.chaves.get(indice) == chave) {
             if (no.folha) {
                 no.chaves.remove(indice);
             } else {
                 BNo filhoEsquerdo = no.filhos.get(indice);
                 BNo filhoDireito = no.filhos.get(indice + 1);
-                
+
                 if (filhoEsquerdo.chaves.size() >= ordem) {
                     double predecessor = encontrarPredecessor(filhoEsquerdo);
                     no.chaves.set(indice, predecessor);
@@ -155,7 +173,7 @@ public class BTree {
             }
         } else {
             if (no.folha) return;
-            
+
             BNo filho = no.filhos.get(indice);
             if (filho.chaves.size() < ordem) {
                 if (indice > 0 && no.filhos.get(indice - 1).chaves.size() >= ordem) {
@@ -198,10 +216,10 @@ public class BTree {
     private void emprestarDoEsquerdo(BNo pai, int indice) {
         BNo filho = pai.filhos.get(indice);
         BNo irmaoEsquerdo = pai.filhos.get(indice - 1);
-        
+
         filho.chaves.add(0, pai.chaves.get(indice - 1));
         pai.chaves.set(indice - 1, irmaoEsquerdo.chaves.remove(irmaoEsquerdo.chaves.size() - 1));
-        
+
         if (!filho.folha) {
             filho.filhos.add(0, irmaoEsquerdo.filhos.remove(irmaoEsquerdo.filhos.size() - 1));
         }
@@ -210,10 +228,10 @@ public class BTree {
     private void emprestarDoDireito(BNo pai, int indice) {
         BNo filho = pai.filhos.get(indice);
         BNo irmaoDireito = pai.filhos.get(indice + 1);
-        
+
         filho.chaves.add(pai.chaves.get(indice));
         pai.chaves.set(indice, irmaoDireito.chaves.remove(0));
-        
+
         if (!filho.folha) {
             filho.filhos.add(irmaoDireito.filhos.remove(0));
         }
@@ -222,13 +240,47 @@ public class BTree {
     private void merge(BNo pai, int indice) {
         BNo esquerdo = pai.filhos.get(indice);
         BNo direito = pai.filhos.get(indice + 1);
-        
+
         esquerdo.chaves.add(pai.chaves.remove(indice));
         esquerdo.chaves.addAll(direito.chaves);
-        
+
         if (!esquerdo.folha) {
             esquerdo.filhos.addAll(direito.filhos);
         }
         pai.filhos.remove(indice + 1);
+    }
+
+    public void imprimirArvore() {
+        imprimirNo(raiz, 0);
+    }
+    
+    private void imprimirNo(BNo no, int nivel) {
+        if (no == null) {
+            System.out.println("Nível " + nivel + ": (vazio)");
+            return;
+        }
+    
+        // Indentação para representar o nível da árvore
+        StringBuilder indentacao = new StringBuilder();
+        for (int i = 0; i < nivel; i++) {
+            indentacao.append("    "); // 4 espaços por nível
+        }
+    
+        // Exibe as chaves do nó
+        System.out.print(indentacao + "Nível " + nivel + ": [");
+        for (int i = 0; i < no.chaves.size(); i++) {
+            System.out.print(no.chaves.get(i));
+            if (i < no.chaves.size() - 1) {
+                System.out.print(", ");
+            }
+        }
+        System.out.println("]");
+    
+        // Recursão para os filhos
+        if (!no.folha) {
+            for (BNo filho : no.filhos) {
+                imprimirNo(filho, nivel + 1);
+            }
+        }
     }
 }
